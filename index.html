@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>4567 Master Pool Engine</title>
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f5f7fa;
+  color: #172033;
+}
+
+header {
+  background: #172033;
+  color: white;
+  padding: 22px 18px;
+}
+
+header h1 {
+  margin: 0 0 6px;
+  font-size: 25px;
+}
+
+header p {
+  margin: 0;
+  opacity: .85;
+  font-size: 14px;
+}
+
+main {
+  max-width: 900px;
+  margin: auto;
+  padding: 18px;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+}
+
+h2 {
+  margin-top: 0;
+  font-size: 20px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 220px;
+  padding: 14px;
+  border: 1px solid #ccd3df;
+  border-radius: 10px;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 6px 4px 6px 0;
+}
+
+.primary {
+  background: #1769e0;
+  color: white;
+}
+
+.secondary {
+  background: #e9edf3;
+  color: #172033;
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.stat {
+  background: #f0f3f8;
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+
+.stat strong {
+  display: block;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.pool {
+  line-height: 1.8;
+  font-weight: 600;
+}
+
+.hit {
+  color: #087a38;
+}
+
+.miss {
+  color: #b42318;
+}
+
+.warning {
+  background: #fff4d6;
+  border-left: 4px solid #e6a700;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.result {
+  border-top: 1px solid #e1e5ec;
+  padding: 14px 0;
+}
+
+.result:first-child {
+  border-top: 0;
+}
+
+.result-title {
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.small {
+  font-size: 13px;
+  color: #657189;
+}
+
+@media(max-width:600px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  main {
+    padding: 12px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<header>
+  <h1>4567 Master Pool Engine</h1>
+  <p>Separate research engine • Connecticut Cash 5</p>
+</header>
+
+<main>
+
+<div class="card">
+  <h2>Research Definition</h2>
+
+  <p>
+    For each target draw, the engine builds four historical pools:
+    previous 4 draws, previous 5 draws, previous 6 draws, and previous 7 draws.
+  </p>
+
+  <p>
+    The four pools are combined into one <strong>4567 Master Pool</strong>.
+    The target draw is then compared against that pool.
+  </p>
+
+  <div class="warning">
+    This engine is a research/backtesting tool. It does not establish
+    predictive odds or guarantee future lottery results.
+  </div>
+</div>
+
+<div class="card">
+
+  <h2>Draw History</h2>
+
+  <p class="small">
+    Enter one draw per line. Format example:
+    4, 6, 10, 33, 35
+  </p>
+
+  <textarea id="drawInput" placeholder="Paste your CT Cash 5 history here..."></textarea>
+
+  <br>
+
+  <button class="primary" onclick="loadDraws()">Load History</button>
+  <button class="secondary" onclick="clearAll()">Clear</button>
+
+  <div id="loadStatus" class="small"></div>
+
+</div>
+
+<div class="card">
+
+  <h2>4567 Master Pool — Current Target</h2>
+
+  <div id="current"></div>
+
+</div>
+
+<div class="card">
+
+  <h2>Walk-Forward Results</h2>
+
+  <div id="summary"></div>
+
+  <div id="results"></div>
+
+</div>
+
+</main>
+
+<script>
+
+let draws = [];
+
+/*
+  Parse the supplied draw history.
+  Each line should contain five numbers.
+*/
+function parseDraws(text) {
+
+  const lines = text
+    .split(/\n+/)
+    .map(x => x.trim())
+    .filter(Boolean);
+
+  const parsed = [];
+
+  for (const line of lines) {
+
+    const nums = line
+      .match(/\d+/g);
+
+    if (!nums || nums.length < 5) {
+      continue;
+    }
+
+    const five = nums
+      .slice(-5)
+      .map(Number)
+      .filter(n => n >= 1 && n <= 35);
+
+    if (five.length === 5) {
+
+      const unique = [...new Set(five)];
+
+      if (unique.length === 5) {
+        parsed.push(unique.sort((a,b) => a-b));
+      }
+    }
+  }
+
+  return parsed;
+}
+
+
+/*
+  Return the union of a number of historical draws.
+*/
+function unionDraws(drawList) {
+
+  const set = new Set();
+
+  for (const draw of drawList) {
+    for (const n of draw) {
+      set.add(n);
+    }
+  }
+
+  return [...set].sort((a,b) => a-b);
+}
+
+
+/*
+  Build the four historical pools:
+  Prev4, Prev5, Prev6, Prev7
+*/
+function build4567(targetIndex) {
+
+  const pools = {};
+
+  for (const size of [4,5,6,7]) {
+
+    const start = targetIndex - size;
+
+    if (start < 0) {
+      pools[size] = [];
+      continue;
+    }
+
+    const previous = draws.slice(start, targetIndex);
+
+    pools[size] = unionDraws(previous);
+  }
+
+  const master = unionDraws([
+    pools[4],
+    pools[5],
+    pools[6],
+    pools[7]
+  ]);
+
+  return {
+    pools,
+    master
+  };
+}
+
+
+/*
+  Compare target draw against master pool.
+*/
+function compareTarget(target, master) {
+
+  const found = target.filter(n => master.includes(n));
+
+  const missing = target.filter(n => !master.includes(n));
+
+  return {
+    found,
+    missing,
+    count: found.length
+  };
+}
+
+
+/*
+  Load history from textarea.
+*/
+function loadDraws() {
+
+  const text = document.getElementById("drawInput").value;
+
+  draws = parseDraws(text);
+
+  const status = document.getElementById("loadStatus");
+
+  if (draws.length < 8) {
+
+    status.innerHTML =
+      "Need at least 8 valid draws to begin 4567 testing.";
+
+    document.getElementById("current").innerHTML = "";
+    document.getElementById("summary").innerHTML = "";
+    document.getElementById("results").innerHTML = "";
+
+    return;
+  }
+
+  status.innerHTML =
+    "Loaded " + draws.length + " valid draws.";
+
+  runEngine();
+}
+
+
+/*
+  Run complete oldest-to-newest walk-forward test.
+*/
+function runEngine() {
+
+  const counts = {
+    5: 0,
+    4: 0,
+    3: 0,
+    2: 0,
+    1: 0,
+    0: 0
+  };
+
+  const records = [];
+
+  /*
+    First eligible target requires seven previous draws.
+  */
+  for (let i = 7; i < draws.length; i++) {
+
+    const target = draws[i];
+
+    const model = build4567(i);
+
+    const comparison =
+      compareTarget(target, model.master);
+
+    counts[comparison.count]++;
+
+    records.push({
+      index: i,
+      target,
+      pools: model.pools,
+      master: model.master,
+      found: comparison.found,
+      missing: comparison.missing,
+      count: comparison.count
+    });
+  }
+
+  renderCurrent(records[records.length - 1]);
+
+  renderSummary(counts, records.length);
+
+  renderResults(records);
+}
+
+
+/*
+  Display latest target.
+*/
+function renderCurrent(record) {
+
+  if (!record) return;
+
+  const html = `
+
+    <p>
+      <strong>Target:</strong>
+      ${record.target.join(" • ")}
+    </p>
+
+    <p>
+      <strong>4567 Master Pool:</strong>
+    </p>
+
+    <div class="pool">
+      ${record.master.join(" • ")}
+    </div>
+
+    <p>
+      <strong>Found:</strong>
+      <span class="hit">
+        ${record.found.join(" • ") || "None"}
+      </span>
+    </p>
+
+    <p>
+      <strong>Missing:</strong>
+      <span class="miss">
+        ${record.missing.join(" • ") || "None"}
+      </span>
+    </p>
+
+    <p>
+      <strong>Containment:</strong>
+      ${record.count}/5
+    </p>
+
+    <hr>
+
+    <p class="small">
+      Previous 4 pool:
+      ${record.pools[4].join(" • ")}
+    </p>
+
+    <p class="small">
+      Previous 5 pool:
+      ${record.pools[5].join(" • ")}
+    </p>
+
+    <p class="small">
+      Previous 6 pool:
+      ${record.pools[6].join(" • ")}
+    </p>
+
+    <p class="small">
+      Previous 7 pool:
+      ${record.pools[7].join(" • ")}
+    </p>
+  `;
+
+  document.getElementById("current").innerHTML = html;
+}
+
+
+/*
+  Display walk-forward summary.
+*/
+function renderSummary(counts, total) {
+
+  const html = `
+
+    <div class="stat-grid">
+
+      <div class="stat">
+        <strong>${counts[5]}</strong>
+        5/5
+      </div>
+
+      <div class="stat">
+        <strong>${counts[4]}</strong>
+        4/5
+      </div>
+
+      <div class="stat">
+        <strong>${counts[3]}</strong>
+        3/5
+      </div>
+
+      <div class="stat">
+        <strong>${counts[2]}</strong>
+        2/5
+      </div>
+
+      <div class="stat">
+        <strong>${counts[1]}</strong>
+        1/5
+      </div>
+
+      <div class="stat">
+        <strong>${counts[0]}</strong>
+        0/5
+      </div>
+
+      <div class="stat">
+        <strong>${total}</strong>
+        Targets
+      </div>
+
+      <div class="stat">
+        <strong>
+          ${total ? ((counts[5] / total) * 100).toFixed(1) : 0}%
+        </strong>
+        5/5 rate
+      </div>
+
+    </div>
+  `;
+
+  document.getElementById("summary").innerHTML = html;
+}
+
+
+/*
+  Display all walk-forward records.
+*/
+function renderResults(records) {
+
+  let html = "";
+
+  /*
+    Show newest results first.
+  */
+  const reversed = [...records].reverse();
+
+  for (const record of reversed) {
+
+    const targetNumber = record.index + 1;
+
+    html += `
+
+      <div class="result">
+
+        <div class="result-title">
+
+          Target #${targetNumber}
+
+          — ${record.count}/5
+
+        </div>
+
+        <div>
+          Draw:
+          <strong>
+            ${record.target.join(" • ")}
+          </strong>
+        </div>
+
+        <div>
+          Found:
+          <span class="hit">
+            ${record.found.join(" • ") || "None"}
+          </span>
+        </div>
+
+        <div>
+          Missing:
+          <span class="miss">
+            ${record.missing.join(" • ") || "None"}
+          </span>
+        </div>
+
+      </div>
+    `;
+  }
+
+  document.getElementById("results").innerHTML = html;
+}
+
+
+/*
+  Clear everything.
+*/
+function clearAll() {
+
+  draws = [];
+
+  document.getElementById("drawInput").value = "";
+
+  document.getElementById("loadStatus").innerHTML = "";
+
+  document.getElementById("current").innerHTML = "";
+
+  document.getElementById("summary").innerHTML = "";
+
+  document.getElementById("results").innerHTML = "";
+}
+
+</script>
+
+</body>
+</html>
